@@ -3,14 +3,14 @@ import os
 import re
 import anthropic
 
-from gen.axiom_official_axiom_agent_messages_messages_pb2 import PackageSpec, NodeSpec
+from gen.axiom_official_axiom_agent_messages_messages_pb2 import PackageBuildContext, NodeSpec
 from gen.axiom_logger import AxiomLogger, AxiomSecrets
 
 
 SYSTEM_PROMPT = """You are an expert Python developer writing Axiom platform node implementations.
-Generate complete, working Python code for each node in the PackageSpec.
-Each node file must contain a handle(input, secrets) -> output function.
-Each test file must contain at least one pytest test that mocks external dependencies."""
+Generate complete, working Python code for each node in the package.
+Each node file must contain a function matching the node name in snake_case.
+Each test file must contain at least one pytest test."""
 
 
 def _to_snake(name: str) -> str:
@@ -18,37 +18,36 @@ def _to_snake(name: str) -> str:
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
 
-def _generate_node_code(client: anthropic.Anthropic, spec: PackageSpec, node: NodeSpec, fix_instructions: str = "") -> tuple:
+def _generate_node_code(client: anthropic.Anthropic, ctx: PackageBuildContext, node: NodeSpec, fix_instructions: str = "") -> tuple:
     fix_section = f"\n\nFix instructions from previous attempt:\n{fix_instructions}" if fix_instructions else ""
 
     prompt = f"""Generate Python code for an Axiom node with these specs:
 
-Package: {spec.name}
+Package: {ctx.name}
 Node: {node.name}
 Description: {node.description}
 Input type: {node.input_message}
 Output type: {node.output_message}
-Node type: {node.node_type} (unary = single request/response)
+Node type: {node.node_type}
 Required secrets: {list(node.required_secrets)}
 
 Proto definitions (messages.proto):
 ```proto
-{spec.proto_content}
+{ctx.proto_content}
 ```
 {fix_section}
 
 Generate two Python files:
 
 FILE 1: nodes/{_to_snake(node.name)}.py
-- Import from gen.axiom_official_axiom_agent_messages_messages_pb2
-- Implement handle(input: {node.input_message}, secrets) -> {node.output_message}
-- Use the AxiomSecrets parameter to access secrets by name
+- Import from gen.messages_pb2 or the appropriate generated module
+- Implement {_to_snake(node.name)}(log: AxiomLogger, secrets: AxiomSecrets, input: {node.input_message}) -> {node.output_message}
+- Use secrets.get("SECRET_NAME") to access secrets
 - Use proper error handling
 
 FILE 2: nodes/test_{_to_snake(node.name)}.py
-- Import pytest and unittest.mock
-- Test that the module imports and handle function exists
-- Mock all external API calls (anthropic, httpx, etc.)
+- Import pytest
+- Test that the module imports and the function is callable
 
 Return as JSON:
 {{
@@ -77,7 +76,7 @@ Return as JSON:
     return data.get("source_code", ""), data.get("test_code", "")
 
 
-def code_generator(log: AxiomLogger, secrets: AxiomSecrets, input: PackageSpec) -> PackageSpec:
+def code_generator(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildContext) -> PackageBuildContext:
     api_key = secrets.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY", "")
     client = anthropic.Anthropic(api_key=api_key)
 
@@ -92,6 +91,7 @@ def code_generator(log: AxiomLogger, secrets: AxiomSecrets, input: PackageSpec) 
         node.source_code = source_code
         node.test_code = test_code
 
+    # Clear fix_instructions after consuming them so they don't repeat next iteration.
     input.fix_instructions = ""
 
     return input

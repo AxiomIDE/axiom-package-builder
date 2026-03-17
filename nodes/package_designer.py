@@ -1,14 +1,14 @@
 import os
+
 import httpx
 
-from gen.axiom_official_axiom_agent_messages_messages_pb2 import PackageSpec
+from gen.axiom_official_axiom_agent_messages_messages_pb2 import PackageBuildContext
 from gen.axiom_logger import AxiomLogger, AxiomSecrets
 
 
-
-def package_designer(log: AxiomLogger, secrets: AxiomSecrets, input: PackageSpec) -> PackageSpec:
-    """Search the marketplace for reusable packages, then expand the PackageSpec
-    with full proto definitions and refined node contracts."""
+def package_designer(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildContext) -> PackageBuildContext:
+    """Search the marketplace for reusable packages, then expand the context
+    with full proto definitions and refined node interface contracts."""
 
     bff_url = os.environ.get("BFF_URL", "http://axiom-bff:8083")
 
@@ -26,7 +26,7 @@ def package_designer(log: AxiomLogger, secrets: AxiomSecrets, input: PackageSpec
             data = resp.json()
             existing_packages = data.get("packages", [])[:3]
     except Exception as e:
-        log.warning(f"Marketplace search failed: {e}")
+        log.warn(f"Marketplace search failed: {e}")
 
     if existing_packages:
         similar_context = "\n\nExisting similar packages found in the marketplace:\n"

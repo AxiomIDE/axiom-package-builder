@@ -3,25 +3,24 @@ import uuid
 
 import httpx
 
-from gen.axiom_official_axiom_agent_messages_messages_pb2 import PublishResult, TestResult
+from gen.axiom_official_axiom_agent_messages_messages_pb2 import PackageBuildContext
 from gen.axiom_logger import AxiomLogger, AxiomSecrets
 
 
+def package_tester(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildContext) -> PackageBuildContext:
+    """Invoke the first published node directly to validate it works in the system."""
 
-def package_tester(log: AxiomLogger, secrets: AxiomSecrets, input: PublishResult) -> TestResult:
-    """Invoke the first published node directly to validate it works."""
-
-    if not input.success:
-        return TestResult(
-            success=False,
-            error=f"Cannot test: package publish failed — {input.error}",
-        )
+    if not input.publish_success:
+        input.test_success = False
+        input.test_error = f"Cannot test: package publish failed — {input.publish_error}"
+        return input
 
     if not input.node_ids:
-        return TestResult(success=True, output_json="{}")
+        input.test_success = True
+        return input
 
     ingress_url = os.environ.get("INGRESS_URL", "http://axiom-ingress:80")
-    axiom_api_key = os.environ.get("AXIOM_API_KEY", "")
+    axiom_api_key = secrets.get("AXIOM_API_KEY") or os.environ.get("AXIOM_API_KEY", "")
 
     session_id = str(uuid.uuid4()).replace("-", "")
     first_node_id = input.node_ids[0]
@@ -37,20 +36,19 @@ def package_tester(log: AxiomLogger, secrets: AxiomSecrets, input: PublishResult
             timeout=60.0,
         )
 
+        input.session_id = session_id
+
         if resp.status_code == 200:
-            return TestResult(
-                success=True,
-                session_id=session_id,
-                output_json=resp.text,
-            )
+            input.test_success = True
         else:
             error_text = resp.text[:500]
-            missing = ["UNKNOWN_SECRET"] if "secret" in error_text.lower() else []
-            return TestResult(
-                success=False,
-                session_id=session_id,
-                error=error_text,
-                missing_secrets=missing,
-            )
+            input.test_success = False
+            input.test_error = error_text
+            if "secret" in error_text.lower():
+                input.missing_secrets.append("UNKNOWN_SECRET")
     except Exception as e:
-        return TestResult(success=False, session_id=session_id, error=str(e))
+        input.test_success = False
+        input.test_error = str(e)
+        input.session_id = session_id
+
+    return input

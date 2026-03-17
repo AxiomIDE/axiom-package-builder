@@ -4,7 +4,7 @@ import os
 import httpx
 import anthropic
 
-from gen.axiom_official_axiom_agent_messages_messages_pb2 import TestResult, AnalysisResult
+from gen.axiom_official_axiom_agent_messages_messages_pb2 import PackageBuildContext
 from gen.axiom_logger import AxiomLogger, AxiomSecrets
 
 
@@ -12,16 +12,16 @@ SYSTEM_PROMPT = """You are an expert at diagnosing errors in Axiom platform node
 Given a test failure and debug events, produce specific fix instructions for the code generator."""
 
 
-def package_error_analyser(log: AxiomLogger, secrets: AxiomSecrets, input: TestResult) -> AnalysisResult:
-    if input.success:
-        return AnalysisResult(has_error=False, fix_instructions="", error_summary="Tests passed")
+def package_error_analyser(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildContext) -> PackageBuildContext:
+    if input.test_success:
+        input.has_error = False
+        input.error_summary = "Tests passed"
+        return input
 
     if input.missing_secrets:
-        return AnalysisResult(
-            has_error=False,
-            fix_instructions="",
-            error_summary=f"Tests skipped: missing secrets {list(input.missing_secrets)}",
-        )
+        input.has_error = False
+        input.error_summary = f"Tests skipped: missing secrets {list(input.missing_secrets)}"
+        return input
 
     api_key = secrets.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY", "")
 
@@ -43,7 +43,7 @@ def package_error_analyser(log: AxiomLogger, secrets: AxiomSecrets, input: TestR
             if resp.status_code == 200:
                 debug_events_text = json.dumps(resp.json(), indent=2)[:3000]
         except Exception as e:
-            log.warning(f"Failed to fetch debug events: {e}")
+            log.warn(f"Failed to fetch debug events: {e}")
 
     client = anthropic.Anthropic(api_key=api_key)
 
@@ -54,7 +54,7 @@ def package_error_analyser(log: AxiomLogger, secrets: AxiomSecrets, input: TestR
         messages=[{
             "role": "user",
             "content": f"""A node test failed with this error:
-{input.error}
+{input.test_error}
 
 Debug events:
 {debug_events_text or "(none available)"}
@@ -64,11 +64,9 @@ What exact changes need to be made to the Python node implementation?"""
         }]
     )
 
-    fix_instructions = message.content[0].text
+    input.has_error = True
+    input.fix_instructions = message.content[0].text
+    input.error_summary = (input.test_error or "Unknown error")[:200]
+    input.iteration = input.iteration + 1
 
-    return AnalysisResult(
-        has_error=True,
-        fix_instructions=fix_instructions,
-        error_summary=input.error[:200] if input.error else "Unknown error",
-        iteration=1,
-    )
+    return input

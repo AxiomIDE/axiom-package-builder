@@ -2,16 +2,16 @@ import json
 import os
 import anthropic
 
-from gen.axiom_official_axiom_agent_messages_messages_pb2 import AgentRequest, PackageSpec, NodeSpec
+from gen.axiom_official_axiom_agent_messages_messages_pb2 import AgentRequest, PackageBuildContext, NodeSpec
 from gen.axiom_logger import AxiomLogger, AxiomSecrets
 
 
-SYSTEM_PROMPT = """You are an expert Axiom platform package designer. 
+SYSTEM_PROMPT = """You are an expert Axiom platform package designer.
 Given a user's goal, design a Python Axiom package with the appropriate nodes.
 Each node should have a single responsibility and clear input/output types.
-Return a JSON object matching the PackageSpec structure."""
+Return a JSON object matching the PackageBuildContext structure."""
 
-def intent_classifier(log: AxiomLogger, secrets: AxiomSecrets, input: AgentRequest) -> PackageSpec:
+def intent_classifier(log: AxiomLogger, secrets: AxiomSecrets, input: AgentRequest) -> PackageBuildContext:
     api_key = secrets.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY", "")
 
     client = anthropic.Anthropic(api_key=api_key)
@@ -26,7 +26,6 @@ Return a JSON object with these fields:
   "name": "axiom-official/<kebab-case-name>",
   "version": "0.1.0",
   "language": "python",
-  "description": "<one sentence description>",
   "nodes": [
     {{
       "name": "<PascalCase>",
@@ -67,17 +66,17 @@ Rules:
 
     data = json.loads(content)
 
-    spec = PackageSpec(
+    ctx = PackageBuildContext(
         name=data.get("name", "axiom-official/new-package"),
         version=data.get("version", "0.1.0"),
         language=data.get("language", "python"),
         proto_content=data.get("proto_content", ""),
         axiom_yaml=data.get("axiom_yaml", ""),
-        fix_instructions=input.goal,
+        requirements_txt="anthropic>=0.40.0\nhttpx>=0.28.0\ngrpcio>=1.60.0\ngrpcio-tools>=1.60.0\nprotobuf>=4.25.0\n",
     )
 
     for nd in data.get("nodes", []):
-        spec.nodes.append(NodeSpec(
+        ctx.nodes.append(NodeSpec(
             name=nd.get("name", ""),
             input_message=nd.get("input_message", ""),
             output_message=nd.get("output_message", ""),
@@ -86,6 +85,4 @@ Rules:
             required_secrets=nd.get("required_secrets", []),
         ))
 
-    spec.requirements_txt = "anthropic>=0.40.0\nhttpx>=0.28.0\ngrpcio>=1.60.0\ngrpcio-tools>=1.60.0\nprotobuf>=4.25.0\n"
-
-    return spec
+    return ctx
