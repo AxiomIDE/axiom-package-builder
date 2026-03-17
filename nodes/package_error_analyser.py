@@ -23,12 +23,11 @@ def package_error_analyser(log: AxiomLogger, secrets: AxiomSecrets, input: Packa
         input.error_summary = f"Tests skipped: missing secrets {list(input.missing_secrets)}"
         return input
 
-    api_key = secrets.get("ANTHROPIC_API_KEY")
-
+    api_key, _ = secrets.get("ANTHROPIC_API_KEY")
     debug_events_text = ""
     if input.session_id:
         ingress_url = os.environ.get("INGRESS_URL", "http://axiom-ingress:80")
-        axiom_api_key = secrets.get("AXIOM_API_KEY", "")
+        axiom_api_key, _ = secrets.get("AXIOM_API_KEY")
         tenant_id = os.environ.get("TENANT_ID", "01AXIOMOFFICIAL000000000000")
         try:
             resp = httpx.get(

@@ -16,9 +16,8 @@ def _to_snake(name: str) -> str:
 
 
 def publisher(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildContext) -> PackageBuildContext:
-    github_token = secrets.get("GITHUB_TOKEN", "")
-    axiom_api_key = secrets.get("AXIOM_API_KEY", "")
-
+    github_token, _ = secrets.get("GITHUB_TOKEN")
+    axiom_api_key, _ = secrets.get("AXIOM_API_KEY")
     tmpdir = tempfile.mkdtemp()
     try:
         pkg_short = input.name.split("/")[-1] if "/" in input.name else input.name
