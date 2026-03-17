@@ -42,7 +42,7 @@ Generate two Python files:
 FILE 1: nodes/{_to_snake(node.name)}.py
 - Import from gen.messages_pb2 or the appropriate generated module
 - Implement {_to_snake(node.name)}(log: AxiomLogger, secrets: AxiomSecrets, input: {node.input_message}) -> {node.output_message}
-- Use secrets.get("SECRET_NAME") to access secrets
+- Use the secrets parameter to access any required secret values
 - Use proper error handling
 
 FILE 2: nodes/test_{_to_snake(node.name)}.py
