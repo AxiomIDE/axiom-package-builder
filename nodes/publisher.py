@@ -21,7 +21,7 @@ def publisher(log: AxiomLogger, secrets: AxiomSecrets, input: PackageSpec) -> Pu
     if not github_token and hasattr(secrets, 'secrets'):
         github_token = secrets.get("GITHUB_TOKEN", "")
 
-    axiom_api_key = os.environ.get("AXIOM_API_KEY", "")
+    axiom_api_key = secrets.get("AXIOM_API_KEY") or os.environ.get("AXIOM_API_KEY", "")
 
     tmpdir = tempfile.mkdtemp()
     try:
