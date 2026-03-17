@@ -42,7 +42,7 @@ Generate two Python files:
 FILE 1: nodes/{_to_snake(node.name)}.py
 - Import from gen.axiom_official_axiom_agent_messages_messages_pb2
 - Implement handle(input: {node.input_message}, secrets) -> {node.output_message}
-- Use secrets.get("SECRET_NAME") for secrets
+- Use secrets.get("MY_SECRET_KEY") for secrets
 - Use proper error handling
 
 FILE 2: nodes/test_{_to_snake(node.name)}.py
