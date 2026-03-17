@@ -1,0 +1,7 @@
+syntax = "proto3";
+package axiom_package_builder;
+option go_package = "axiom-official/axiom-package-builder/gen";
+
+// This package re-uses the shared message types from axiom-agent-messages.
+// The messages below are just aliases to clarify the flow graph connections.
+// Import the shared types at runtime from the gen/ directory.
