@@ -26,7 +26,7 @@ def package_designer(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuil
             data = resp.json()
             existing_packages = data.get("packages", [])[:3]
     except Exception as e:
-        log.warn(f"Marketplace search failed: {e}")
+        log.info(f"Marketplace search failed: {e}")
 
     if existing_packages:
         similar_context = "\n\nExisting similar packages found in the marketplace:\n"

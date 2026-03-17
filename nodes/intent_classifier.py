@@ -1,5 +1,4 @@
 import json
-import os
 import anthropic
 
 from gen.axiom_official_axiom_agent_messages_messages_pb2 import AgentRequest, PackageBuildContext, NodeSpec
@@ -12,14 +11,14 @@ Each node should have a single responsibility and clear input/output types.
 Return a JSON object matching the PackageBuildContext structure."""
 
 def intent_classifier(log: AxiomLogger, secrets: AxiomSecrets, input: AgentRequest) -> PackageBuildContext:
-    api_key = secrets.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY", "")
+    api_key = secrets.get("ANTHROPIC_API_KEY")
 
     client = anthropic.Anthropic(api_key=api_key)
 
     user_prompt = f"""Design an Axiom package to accomplish this goal:
-{input.goal}
+{input.prompt}
 
-Target language: {input.language or 'python'}
+Target language: python
 
 Return a JSON object with these fields:
 {{

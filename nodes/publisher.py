@@ -17,7 +17,7 @@ def _to_snake(name: str) -> str:
 
 def publisher(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildContext) -> PackageBuildContext:
     github_token = secrets.get("GITHUB_TOKEN", "")
-    axiom_api_key = secrets.get("AXIOM_API_KEY") or os.environ.get("AXIOM_API_KEY", "")
+    axiom_api_key = secrets.get("AXIOM_API_KEY", "")
 
     tmpdir = tempfile.mkdtemp()
     try:

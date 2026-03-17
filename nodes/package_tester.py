@@ -20,7 +20,7 @@ def package_tester(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildC
         return input
 
     ingress_url = os.environ.get("INGRESS_URL", "http://axiom-ingress:80")
-    axiom_api_key = secrets.get("AXIOM_API_KEY") or os.environ.get("AXIOM_API_KEY", "")
+    axiom_api_key = secrets.get("AXIOM_API_KEY", "")
 
     session_id = str(uuid.uuid4()).replace("-", "")
     first_node_id = input.node_ids[0]
