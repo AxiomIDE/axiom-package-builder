@@ -1,26 +1,25 @@
 import json
-import logging
 import os
 import anthropic
 
 from gen.axiom_official_axiom_agent_messages_messages_pb2 import AgentRequest, PackageSpec, NodeSpec
+from gen.axiom_logger import AxiomLogger, AxiomSecrets
 
-logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """You are an expert Axiom platform package designer. 
 Given a user's goal, design a Python Axiom package with the appropriate nodes.
 Each node should have a single responsibility and clear input/output types.
 Return a JSON object matching the PackageSpec structure."""
 
-def handle(req: AgentRequest, context) -> PackageSpec:
-    api_key = context.secrets.get("ANTHROPIC_API_KEY") if hasattr(context, 'secrets') else os.environ.get("ANTHROPIC_API_KEY", "")
+def intent_classifier(log: AxiomLogger, secrets: AxiomSecrets, input: AgentRequest) -> PackageSpec:
+    api_key = secrets.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY", "")
 
     client = anthropic.Anthropic(api_key=api_key)
 
     user_prompt = f"""Design an Axiom package to accomplish this goal:
-{req.goal}
+{input.goal}
 
-Target language: {req.language or 'python'}
+Target language: {input.language or 'python'}
 
 Return a JSON object with these fields:
 {{
@@ -74,7 +73,7 @@ Rules:
         language=data.get("language", "python"),
         proto_content=data.get("proto_content", ""),
         axiom_yaml=data.get("axiom_yaml", ""),
-        fix_instructions=req.goal,
+        fix_instructions=input.goal,
     )
 
     for nd in data.get("nodes", []):

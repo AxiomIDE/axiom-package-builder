@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 def test_intent_classifier_imports():
     """Verify the module can be imported without errors."""
     import nodes.intent_classifier as m
-    assert hasattr(m, "handle")
+    assert hasattr(m, "intent_classifier")
 
 
 def test_handle_returns_package_spec():

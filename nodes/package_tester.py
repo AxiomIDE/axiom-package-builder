@@ -1,31 +1,30 @@
-import logging
 import os
 import uuid
 
 import httpx
 
 from gen.axiom_official_axiom_agent_messages_messages_pb2 import PublishResult, TestResult
+from gen.axiom_logger import AxiomLogger, AxiomSecrets
 
-logger = logging.getLogger(__name__)
 
 
-def handle(result: PublishResult, context) -> TestResult:
+def package_tester(log: AxiomLogger, secrets: AxiomSecrets, input: PublishResult) -> TestResult:
     """Invoke the first published node directly to validate it works."""
 
-    if not result.success:
+    if not input.success:
         return TestResult(
             success=False,
-            error=f"Cannot test: package publish failed — {result.error}",
+            error=f"Cannot test: package publish failed — {input.error}",
         )
 
-    if not result.node_ids:
+    if not input.node_ids:
         return TestResult(success=True, output_json="{}")
 
     ingress_url = os.environ.get("INGRESS_URL", "http://axiom-ingress:80")
     axiom_api_key = os.environ.get("AXIOM_API_KEY", "")
 
     session_id = str(uuid.uuid4()).replace("-", "")
-    first_node_id = result.node_ids[0]
+    first_node_id = input.node_ids[0]
 
     try:
         resp = httpx.post(

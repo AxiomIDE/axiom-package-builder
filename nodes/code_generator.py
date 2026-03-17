@@ -1,16 +1,15 @@
 import json
-import logging
 import os
 import re
 import anthropic
 
 from gen.axiom_official_axiom_agent_messages_messages_pb2 import PackageSpec, NodeSpec
+from gen.axiom_logger import AxiomLogger, AxiomSecrets
 
-logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """You are an expert Python developer writing Axiom platform node implementations.
 Generate complete, working Python code for each node in the PackageSpec.
-Each node file must contain a handle(input, context) -> output function.
+Each node file must contain a handle(input, secrets) -> output function.
 Each test file must contain at least one pytest test that mocks external dependencies."""
 
 
@@ -42,8 +41,8 @@ Generate two Python files:
 
 FILE 1: nodes/{_to_snake(node.name)}.py
 - Import from gen.axiom_official_axiom_agent_messages_messages_pb2
-- Implement handle(input: {node.input_message}, context) -> {node.output_message}
-- Use context.secrets.get("SECRET_NAME") for secrets
+- Implement handle(input: {node.input_message}, secrets) -> {node.output_message}
+- Use secrets.get("SECRET_NAME") for secrets
 - Use proper error handling
 
 FILE 2: nodes/test_{_to_snake(node.name)}.py
@@ -78,21 +77,21 @@ Return as JSON:
     return data.get("source_code", ""), data.get("test_code", "")
 
 
-def handle(spec: PackageSpec, context) -> PackageSpec:
-    api_key = context.secrets.get("ANTHROPIC_API_KEY") if hasattr(context, 'secrets') else os.environ.get("ANTHROPIC_API_KEY", "")
+def code_generator(log: AxiomLogger, secrets: AxiomSecrets, input: PackageSpec) -> PackageSpec:
+    api_key = secrets.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY", "")
     client = anthropic.Anthropic(api_key=api_key)
 
-    fix_instructions = spec.fix_instructions or ""
+    fix_instructions = input.fix_instructions or ""
 
-    for node in spec.nodes:
+    for node in input.nodes:
         if node.source_code and not fix_instructions:
             continue
 
-        logger.info(f"Generating code for node {node.name}")
-        source_code, test_code = _generate_node_code(client, spec, node, fix_instructions)
+        log.info(f"Generating code for node {node.name}")
+        source_code, test_code = _generate_node_code(client, input, node, fix_instructions)
         node.source_code = source_code
         node.test_code = test_code
 
-    spec.fix_instructions = ""
+    input.fix_instructions = ""
 
-    return spec
+    return input

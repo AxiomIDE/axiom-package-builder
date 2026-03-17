@@ -1,4 +1,3 @@
-import logging
 import os
 import re
 import subprocess
@@ -8,8 +7,8 @@ import shutil
 import httpx
 
 from gen.axiom_official_axiom_agent_messages_messages_pb2 import PackageSpec, PublishResult
+from gen.axiom_logger import AxiomLogger, AxiomSecrets
 
-logger = logging.getLogger(__name__)
 
 
 def _to_snake(name: str) -> str:
@@ -17,16 +16,16 @@ def _to_snake(name: str) -> str:
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
 
-def handle(spec: PackageSpec, context) -> PublishResult:
-    github_token = spec.repo_url  # re-used field to pass token through
-    if not github_token and hasattr(context, 'secrets'):
-        github_token = context.secrets.get("GITHUB_TOKEN", "")
+def publisher(log: AxiomLogger, secrets: AxiomSecrets, input: PackageSpec) -> PublishResult:
+    github_token = input.repo_url  # re-used field to pass token through
+    if not github_token and hasattr(secrets, 'secrets'):
+        github_token = secrets.get("GITHUB_TOKEN", "")
 
     axiom_api_key = os.environ.get("AXIOM_API_KEY", "")
 
     tmpdir = tempfile.mkdtemp()
     try:
-        pkg_short = spec.name.split("/")[-1] if "/" in spec.name else spec.name
+        pkg_short = input.name.split("/")[-1] if "/" in input.name else input.name
         org = "AxiomIDE"
 
         repo_url = f"https://github.com/{org}/{pkg_short}"
@@ -43,7 +42,7 @@ def handle(spec: PackageSpec, context) -> PublishResult:
                 headers=headers,
                 json={
                     "name": pkg_short,
-                    "description": spec.name,
+                    "description": input.name,
                     "private": False,
                     "auto_init": False,
                 }
@@ -51,7 +50,7 @@ def handle(spec: PackageSpec, context) -> PublishResult:
             if create_resp.status_code not in (200, 201):
                 return PublishResult(
                     success=False,
-                    package_name=spec.name,
+                    package_name=input.name,
                     error=f"Failed to create GitHub repo: {create_resp.text}"
                 )
 
@@ -59,19 +58,19 @@ def handle(spec: PackageSpec, context) -> PublishResult:
         os.makedirs(os.path.join(tmpdir, "nodes"), exist_ok=True)
         os.makedirs(os.path.join(tmpdir, "gen"), exist_ok=True)
 
-        if spec.axiom_yaml:
+        if input.axiom_yaml:
             with open(os.path.join(tmpdir, "axiom.yaml"), "w") as f:
-                f.write(spec.axiom_yaml)
+                f.write(input.axiom_yaml)
 
-        if spec.proto_content:
+        if input.proto_content:
             with open(os.path.join(tmpdir, "messages", "messages.proto"), "w") as f:
-                f.write(spec.proto_content)
+                f.write(input.proto_content)
 
-        reqs = spec.requirements_txt or "grpcio>=1.60.0\ngrpcio-tools>=1.60.0\nprotobuf>=4.25.0\n"
+        reqs = input.requirements_txt or "grpcio>=1.60.0\ngrpcio-tools>=1.60.0\nprotobuf>=4.25.0\n"
         with open(os.path.join(tmpdir, "requirements.txt"), "w") as f:
             f.write(reqs)
 
-        for node in spec.nodes:
+        for node in input.nodes:
             snake_name = _to_snake(node.name)
             if node.source_code:
                 with open(os.path.join(tmpdir, "nodes", f"{snake_name}.py"), "w") as f:
@@ -88,16 +87,16 @@ def handle(spec: PackageSpec, context) -> PublishResult:
         if not commit_sha:
             return PublishResult(
                 success=False,
-                package_name=spec.name,
+                package_name=input.name,
                 repo_url=repo_url,
                 error="Failed to push files to GitHub"
             )
 
-        return _axiom_publish(spec.name, repo_url, commit_sha, axiom_api_key)
+        return _axiom_publish(input.name, repo_url, commit_sha, axiom_api_key)
 
     except Exception as e:
-        logger.exception("Publisher failed")
-        return PublishResult(success=False, package_name=spec.name, error=str(e))
+        log.exception("Publisher failed")
+        return PublishResult(success=False, package_name=input.name, error=str(e))
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -118,7 +117,7 @@ def _push_to_github(directory: str, org: str, repo: str, headers: dict) -> str:
     )
 
     if result.returncode != 0:
-        logger.error(f"git push failed: {result.stderr}")
+        log.error(f"git push failed: {result.stderr}")
         return ""
 
     sha_result = subprocess.run(

@@ -1,13 +1,12 @@
-import logging
 import os
 import httpx
 
 from gen.axiom_official_axiom_agent_messages_messages_pb2 import PackageSpec
+from gen.axiom_logger import AxiomLogger, AxiomSecrets
 
-logger = logging.getLogger(__name__)
 
 
-def handle(spec: PackageSpec, context) -> PackageSpec:
+def package_designer(log: AxiomLogger, secrets: AxiomSecrets, input: PackageSpec) -> PackageSpec:
     """Search the marketplace for reusable packages, then expand the PackageSpec
     with full proto definitions and refined node contracts."""
 
@@ -15,9 +14,9 @@ def handle(spec: PackageSpec, context) -> PackageSpec:
 
     existing_packages = []
     try:
-        query = spec.name.split("/")[-1].replace("-", " ")
-        if spec.nodes:
-            query += " " + spec.nodes[0].description
+        query = input.name.split("/")[-1].replace("-", " ")
+        if input.nodes:
+            query += " " + input.nodes[0].description
         resp = httpx.post(
             f"{bff_url}/app/marketplace/search/semantic",
             json={"q": query},
@@ -27,13 +26,13 @@ def handle(spec: PackageSpec, context) -> PackageSpec:
             data = resp.json()
             existing_packages = data.get("packages", [])[:3]
     except Exception as e:
-        logger.warning(f"Marketplace search failed: {e}")
+        log.warning(f"Marketplace search failed: {e}")
 
     if existing_packages:
         similar_context = "\n\nExisting similar packages found in the marketplace:\n"
         for pkg in existing_packages:
             similar_context += f"- {pkg.get('name')}: {pkg.get('description', '')}\n"
         similar_context += "\nConsider importing these instead of rebuilding the same functionality.\n"
-        spec.fix_instructions = (spec.fix_instructions or "") + similar_context
+        input.fix_instructions = (input.fix_instructions or "") + similar_context
 
-    return spec
+    return input
