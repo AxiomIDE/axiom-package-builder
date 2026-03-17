@@ -20,14 +20,9 @@ nodes:
   - name: CodeGenerator
     input: PackageBuildContext
     output: PackageBuildContext
-    description: Generates complete Python node implementations (NodeSpec.source_code and test_code) for every node in the context. Uses fix_instructions on retry iterations.
+    description: Scaffolds the package with the axiom CLI (axiom init, axiom create message, axiom create node), uses the LLM to fill in proto fields, function bodies, and test assertions, then runs axiom publish. Uses fix_instructions on retry iterations.
     required_secrets:
       - ANTHROPIC_API_KEY
-  - name: Publisher
-    input: PackageBuildContext
-    output: PackageBuildContext
-    description: Creates a GitHub repo under AxiomIDE, commits all generated code, runs axiom publish, and populates repo_url, commit_hash, publish_success, publish_error, and node_ids.
-    required_secrets:
       - GITHUB_TOKEN
       - AXIOM_API_KEY
   - name: PackageTester
@@ -50,6 +45,7 @@ nodes:
 build:
   system_deps:
     - git
+    - axiom
 imports:
   - package: axiom-official/axiom-agent-messages
     version: 0.1.0
