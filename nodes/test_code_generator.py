@@ -1,7 +1,8 @@
-def test_code_generator_imports():
-    import nodes.code_generator as m
-    assert hasattr(m, "code_generator")
+from nodes.code_generator import code_generator
 
+
+def test_code_generator_imports():
+    assert callable(code_generator)
 
 def test_to_snake():
     from nodes.code_generator import _to_snake

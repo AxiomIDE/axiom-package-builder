@@ -1,3 +1,5 @@
+from nodes.build_result import build_result
+
+
 def test_build_result_imports():
-    import nodes.build_result as m
-    assert hasattr(m, "build_result")
+    assert callable(build_result)

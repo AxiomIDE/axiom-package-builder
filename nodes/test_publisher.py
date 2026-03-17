@@ -1,3 +1,5 @@
+from nodes.publisher import publisher
+
+
 def test_publisher_imports():
-    import nodes.publisher as m
-    assert hasattr(m, "publisher")
+    assert callable(publisher)

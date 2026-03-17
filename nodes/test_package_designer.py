@@ -1,3 +1,5 @@
+from nodes.package_designer import package_designer
+
+
 def test_package_designer_imports():
-    import nodes.package_designer as m
-    assert hasattr(m, "package_designer")
+    assert callable(package_designer)

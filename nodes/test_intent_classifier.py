@@ -1,12 +1,8 @@
-import pytest
-from unittest.mock import MagicMock, patch
+from nodes.intent_classifier import intent_classifier
 
 
 def test_intent_classifier_imports():
-    """Verify the module can be imported without errors."""
-    import nodes.intent_classifier as m
-    assert hasattr(m, "intent_classifier")
-
+    assert callable(intent_classifier)
 
 def test_handle_returns_package_spec():
     """IntentClassifier returns a PackageSpec-compatible object."""
