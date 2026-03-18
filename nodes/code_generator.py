@@ -342,7 +342,7 @@ def code_generator(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildC
     fix_instructions = input.fix_instructions or ""
     pkg_short = input.name.split("/")[-1] if "/" in input.name else input.name
     org = "AxiomIDE"
-    registry_url = os.environ.get("REGISTRY_URL", "http://axiom-registry.default.svc.cluster.local:8082")
+    registry_url = os.environ.get("REGISTRY_URL", "http://axiom-registry:8082")
 
     tmpdir = tempfile.mkdtemp()
     try:
@@ -481,9 +481,11 @@ def code_generator(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildC
         log.error(f"CodeGenerator failed: {e}")
         import traceback
         log.error(traceback.format_exc())
+        input.has_error = True
         input.publish_success = False
         input.publish_error = str(e)
-        input.fix_instructions = ""
+        input.error_summary = f"CodeGenerator error (iteration {input.iteration}): {e}"
+        input.fix_instructions = f"The code generation failed with: {e}\nReview the error and try a different approach."
         return input
 
     finally:
