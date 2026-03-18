@@ -6,15 +6,16 @@ eliminates the entire class of import, axiom.yaml, and signature bugs that arise
 when the LLM generates files from scratch.
 
 Workflow:
-  1. axiom init <name> --language python
-  2. axiom create message <Input> / <Output> for each node
+  1. axiom init <name> --language python --description ... --version ... --no-example-comment
+  2. axiom create message <Input> --no-generate / <Output> for each node
   3. LLM fills proto field definitions into messages/messages.proto
   4. axiom generate  (rebuild gen/ from updated proto)
-  5. axiom create node <Name> --input X --output Y --type unary
-  6. LLM fills function body into each nodes/<name>.py
-  7. LLM fills test assertions into each nodes/test_<name>.py
-  8. git init + push to GitHub (create repo if needed)
-  9. axiom publish
+  5. axiom create node <Name> --input X --output Y --type unary --no-generate (all nodes)
+  6. axiom generate  (once for all nodes)
+  7. LLM fills function body into each nodes/<name>.py
+  8. LLM fills test assertions into each nodes/test_<name>.py
+  9. git init + push to GitHub (create repo if needed)
+  10. axiom publish --json
 """
 
 import json
@@ -348,20 +349,28 @@ def code_generator(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildC
         log.info(f"Starting CLI-driven code generation for {input.name} (iteration {input.iteration})")
 
         # 1. axiom init — writes axiom.yaml + scaffold into cwd (tmpdir)
-        log.info(f"Running: axiom init {input.name} --language python")
-        _run(["axiom", "init", input.name, "--language", "python"], cwd=tmpdir, log=log)
+        log.info(f"Running: axiom init {input.name} --language python --no-example-comment")
+        _run([
+            "axiom", "init", input.name,
+            "--language", "python",
+            "--description", input.description or input.name,
+            "--version", input.version or "0.1.0",
+            "--no-example-comment",
+        ], cwd=tmpdir, log=log)
 
         # axiom init uses os.Getwd() so all files land directly in tmpdir
         pkg_dir = tmpdir
 
-        # 2. Create message stubs for all unique input/output types
+        # 2. Create message stubs for all unique input/output types.
+        # Use --no-generate to skip the auto-generate step after each message;
+        # we will run axiom generate once after the LLM fills all proto fields.
         created_messages: set[str] = set()
         for node in input.nodes:
             for msg_name in [node.input_message, node.output_message]:
                 if msg_name and msg_name not in created_messages:
                     log.info(f"Creating message stub: {msg_name}")
                     result = _run(
-                        ["axiom", "create", "message", msg_name],
+                        ["axiom", "create", "message", msg_name, "--no-generate"],
                         cwd=pkg_dir, log=log, check=False
                     )
                     if result.returncode == 0:
@@ -379,7 +388,9 @@ def code_generator(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildC
         log.info("Running: axiom generate")
         _run(["axiom", "generate"], cwd=pkg_dir, log=log)
 
-        # 5. Create node scaffolds for each node
+        # 5. Create node scaffolds for each node.
+        # Use --no-generate on every node to avoid running generate N times;
+        # we run axiom generate once after all nodes are scaffolded.
         for node in input.nodes:
             log.info(f"Creating node scaffold: {node.name}")
             cmd = [
@@ -387,10 +398,16 @@ def code_generator(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildC
                 "--input", node.input_message,
                 "--output", node.output_message,
                 "--type", node.node_type or "unary",
+                "--no-generate",
             ]
             if node.description:
                 cmd += ["--description", node.description]
             _run(cmd, cwd=pkg_dir, log=log)
+
+        # Run axiom generate once after all nodes are scaffolded to produce
+        # the service stubs needed by the node implementations.
+        log.info("Running: axiom generate (after node scaffolding)")
+        _run(["axiom", "generate"], cwd=pkg_dir, log=log)
 
         # 6. LLM fills in function bodies and test assertions for each node
         for node in input.nodes:
@@ -410,29 +427,50 @@ def code_generator(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildC
         input.commit_hash = commit_sha
         log.info(f"Pushed to {input.repo_url}@{commit_sha[:8]}")
 
-        # 8. Write axiom credentials and run axiom publish
+        # 8. Write axiom credentials and run axiom publish --json
         _write_axiom_credentials(axiom_api_key)
 
         env = os.environ.copy()
         env["AXIOM_API_URL"] = registry_url
 
-        log.info("Running: axiom publish")
+        log.info("Running: axiom publish --json")
         result = subprocess.run(
-            ["axiom", "publish"],
+            ["axiom", "publish", "--json"],
             cwd=pkg_dir, capture_output=True, text=True, env=env
         )
 
-        publish_output = result.stdout + result.stderr
-        log.info(f"axiom publish output: {publish_output[-1000:]}")
+        log.info(f"axiom publish stdout: {result.stdout[-1000:]}")
+        if result.stderr.strip():
+            log.info(f"axiom publish stderr: {result.stderr[-500:]}")
 
         if result.returncode != 0:
+            # Try to parse structured JSON error first
+            try:
+                data = json.loads(result.stdout) if result.stdout.strip() else {}
+                input.publish_error = data.get("error") or result.stderr[-500:] or result.stdout[-500:]
+            except (json.JSONDecodeError, ValueError):
+                input.publish_error = (result.stderr or result.stdout)[-500:]
             input.publish_success = False
-            input.publish_error = publish_output[-500:]
             log.info(f"Publish failed: {input.publish_error}")
         else:
-            input.publish_success = True
-            input.publish_error = ""
-            log.info("Package published successfully")
+            try:
+                data = json.loads(result.stdout)
+                input.publish_success = data.get("success", False)
+                node_ids = [n.get("id", "") for n in data.get("nodes", []) if n.get("id")]
+                if node_ids:
+                    for nid in node_ids:
+                        input.node_ids.append(nid)
+                if not input.publish_success:
+                    input.publish_error = data.get("error", "unknown error")
+                    log.info(f"Publish reported failure: {input.publish_error}")
+                else:
+                    input.publish_error = ""
+                    log.info("Package published successfully")
+            except (json.JSONDecodeError, ValueError):
+                # Fallback: if JSON parse fails but exit code was 0, treat as success
+                input.publish_success = True
+                input.publish_error = ""
+                log.info("Package published successfully (non-JSON output)")
 
         # Clear fix_instructions after consuming them
         input.fix_instructions = ""
