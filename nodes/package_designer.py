@@ -10,7 +10,7 @@ def package_designer(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuil
     """Search the marketplace for reusable packages, then expand the context
     with full proto definitions and refined node interface contracts."""
 
-    bff_url = os.environ.get("BFF_URL", "http://axiom-bff:8083")
+    bff_url = os.environ.get("BFF_URL", "http://axiom-bff.default.svc.cluster.local:8083")
 
     existing_packages = []
     try:

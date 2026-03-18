@@ -19,7 +19,7 @@ def package_tester(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildC
         input.test_success = True
         return input
 
-    ingress_url = os.environ.get("INGRESS_URL", "http://axiom-ingress:80")
+    ingress_url = os.environ.get("INGRESS_URL", "http://axiom-ingress.default.svc.cluster.local:80")
     axiom_api_key, _ = secrets.get("AXIOM_API_KEY")
     session_id = str(uuid.uuid4()).replace("-", "")
     first_node_id = input.node_ids[0]
