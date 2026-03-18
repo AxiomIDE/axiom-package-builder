@@ -11,7 +11,8 @@ Each node should have a single responsibility and clear input/output types.
 Return a JSON object matching the PackageBuildContext structure."""
 
 def intent_classifier(log: AxiomLogger, secrets: AxiomSecrets, input: AgentRequest) -> PackageBuildContext:
-    api_key, _ = secrets.get("ANTHROPIC_API_KEY")
+    api_key = secrets.get("ANTHROPIC_API_KEY")
+
     client = anthropic.Anthropic(api_key=api_key)
 
     user_prompt = f"""Design an Axiom package to accomplish this goal:
@@ -24,6 +25,7 @@ Return a JSON object with these fields:
   "name": "axiom-official/<kebab-case-name>",
   "version": "0.1.0",
   "language": "python",
+  "description": "<one sentence describing what the package does>",
   "nodes": [
     {{
       "name": "<PascalCase>",
@@ -68,6 +70,7 @@ Rules:
         name=data.get("name", "axiom-official/new-package"),
         version=data.get("version", "0.1.0"),
         language=data.get("language", "python"),
+        description=data.get("description", ""),
         proto_content=data.get("proto_content", ""),
         axiom_yaml=data.get("axiom_yaml", ""),
         requirements_txt="anthropic>=0.40.0\nhttpx>=0.28.0\ngrpcio>=1.60.0\ngrpcio-tools>=1.60.0\nprotobuf>=4.25.0\n",
