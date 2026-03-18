@@ -343,7 +343,7 @@ def code_generator(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildC
     fix_instructions = input.fix_instructions or ""
     pkg_short = input.name.split("/")[-1] if "/" in input.name else input.name
     org = "AxiomIDE"
-    registry_url = os.environ.get("REGISTRY_URL", "http://axiom-registry:8082")
+    registry_url = os.environ.get("REGISTRY_URL", "http://axiom-registry.default.svc.cluster.local:8082")
 
     tmpdir = tempfile.mkdtemp()
     try:
