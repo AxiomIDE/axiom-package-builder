@@ -11,7 +11,7 @@ Each node should have a single responsibility and clear input/output types.
 Return a JSON object matching the PackageBuildContext structure."""
 
 def intent_classifier(log: AxiomLogger, secrets: AxiomSecrets, input: AgentRequest) -> PackageBuildContext:
-    api_key = secrets.get("ANTHROPIC_API_KEY")
+    api_key, _ = secrets.get("ANTHROPIC_API_KEY")
 
     client = anthropic.Anthropic(api_key=api_key)
 
