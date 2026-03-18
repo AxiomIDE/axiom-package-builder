@@ -388,6 +388,11 @@ def code_generator(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildC
         log.info("Running: axiom generate")
         _run(["axiom", "generate"], cwd=pkg_dir, log=log)
 
+        # Write requirements.txt so axiom validate passes the language-files check.
+        req_content = input.requirements_txt or "grpcio>=1.60.0\ngrpcio-tools>=1.60.0\nprotobuf>=4.25.0\n"
+        _write_file(os.path.join(pkg_dir, "requirements.txt"), req_content)
+        log.info("Wrote requirements.txt")
+
         # 5. Create node scaffolds for each node.
         # Use --no-generate on every node to avoid running generate N times;
         # we run axiom generate once after all nodes are scaffolded.
@@ -447,7 +452,20 @@ def code_generator(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildC
             # Try to parse structured JSON error first
             try:
                 data = json.loads(result.stdout) if result.stdout.strip() else {}
-                input.publish_error = data.get("error") or result.stderr[-500:] or result.stdout[-500:]
+                base_error = data.get("error") or result.stderr[-500:] or result.stdout[-500:]
+                # Include failing check details so PackageErrorAnalyser has actionable info
+                failed_checks = [
+                    c for c in data.get("checks", [])
+                    if not c.get("ok") and not c.get("warning")
+                ]
+                if failed_checks:
+                    details = "; ".join(
+                        f"{c['category']}: {c['name']}" + (f" — {c['detail']}" if c.get('detail') else "")
+                        for c in failed_checks
+                    )
+                    input.publish_error = f"{base_error}. Failing checks: {details}"
+                else:
+                    input.publish_error = base_error
             except (json.JSONDecodeError, ValueError):
                 input.publish_error = (result.stderr or result.stdout)[-500:]
             input.publish_success = False
