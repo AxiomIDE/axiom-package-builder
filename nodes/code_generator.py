@@ -270,7 +270,8 @@ def _fill_test_assertions(
 ) -> None:
     """LLM fills meaningful test assertions into the scaffolded test file."""
     snake_name = _to_snake(node.name)
-    test_path = os.path.join(tmpdir, "nodes", f"test_{snake_name}.py")
+    # axiom create node generates <name>_test.py (e.g. add_test.py)
+    test_path = os.path.join(tmpdir, "nodes", f"{snake_name}_test.py")
 
     if not os.path.exists(test_path):
         log.info(f"Warning: {test_path} not found, skipping test fill")
@@ -465,6 +466,8 @@ def code_generator(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildC
                         for c in failed_checks
                     )
                     input.publish_error = f"{base_error}. Failing checks: {details}"
+                elif data.get("build_log"):
+                    input.publish_error = f"{base_error}.\n\nBuild output (last lines):\n{data['build_log']}"
                 else:
                     input.publish_error = base_error
             except (json.JSONDecodeError, ValueError):
