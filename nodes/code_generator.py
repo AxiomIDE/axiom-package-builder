@@ -270,8 +270,8 @@ def _fill_test_assertions(
 ) -> None:
     """LLM fills meaningful test assertions into the scaffolded test file."""
     snake_name = _to_snake(node.name)
-    # axiom create node generates test_<name>.py (e.g. test_add.py)
-    test_path = os.path.join(tmpdir, "nodes", f"test_{snake_name}.py")
+    # axiom create node generates <name>_test.py (e.g. add_test.py)
+    test_path = os.path.join(tmpdir, "nodes", f"{snake_name}_test.py")
 
     if not os.path.exists(test_path):
         log.info(f"Warning: {test_path} not found, skipping test fill")
@@ -313,8 +313,11 @@ Rules:
   * Field value assertions: assert result.some_field == expected_value
 - Each test function must have at least one assert statement.
 - Mock the log and secrets parameters: log = Mock(), secrets = Mock()
-- Do NOT test for error conditions unless clearly appropriate.
-- Keep test functions simple and focused on happy-path scenarios."""
+- CRITICAL: Use only safe, non-edge-case input values. For numeric inputs:
+  * Use small positive non-zero integers (e.g. 10, 5, 3, 2, 4) — NEVER 0 as a divisor.
+  * Never use values that would cause division by zero, overflow, or expected exceptions.
+- Test ONLY the happy path — do NOT test error conditions or exceptions.
+- Keep test functions simple and focused on the most basic valid input."""
 
     message = client.messages.create(
         model="claude-sonnet-4-5",
@@ -324,7 +327,7 @@ Rules:
 
     updated_tests = _extract_code_block(message.content[0].text)
     _write_file(test_path, updated_tests)
-    log.info(f"Test assertions filled: nodes/test_{snake_name}.py ({len(updated_tests)} chars)")
+    log.info(f"Test assertions filled: nodes/{snake_name}_test.py ({len(updated_tests)} chars)")
 
 def code_generator(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildContext) -> PackageBuildContext:
     """CLI-driven package code generation.
