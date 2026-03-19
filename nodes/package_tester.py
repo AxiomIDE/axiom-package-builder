@@ -1,4 +1,3 @@
-import os
 import uuid
 
 import httpx
@@ -19,14 +18,15 @@ def package_tester(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildC
         input.test_success = True
         return input
 
-    ingress_url = os.environ.get("INGRESS_URL", "http://axiom-ingress.default.svc.cluster.local:80")
+    gateway_url = "http://axiom-gateway.default.svc.cluster.local:8090"
     axiom_api_key, _ = secrets.get("AXIOM_API_KEY")
+
     session_id = str(uuid.uuid4()).replace("-", "")
     first_node_id = input.node_ids[0]
 
     try:
         resp = httpx.post(
-            f"{ingress_url}/v1/nodes/{first_node_id}",
+            f"{gateway_url}/invocations/v1/nodes/{first_node_id}",
             json={},
             headers={
                 "Authorization": f"Bearer {axiom_api_key}",
