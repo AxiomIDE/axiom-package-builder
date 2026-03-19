@@ -5,53 +5,52 @@ description: Builds new Axiom packages from natural language prompts using LLM-d
 author: Axiom Official
 license: MIT
 nodes:
-    - name: IntentClassifier
-      description: Parses the user's prompt and produces an initial PackageBuildContext with inferred node names, descriptions, and proto message stubs.
-      input: AgentRequest
-      output: PackageBuildContext
-      required_secrets:
-        - ANTHROPIC_API_KEY
-    - name: PackageDesigner
-      description: Expands the context to include full proto message definitions and detailed node interface contracts, searching the marketplace for reusable packages first.
-      input: PackageBuildContext
-      output: PackageBuildContext
-      required_secrets:
-        - AXIOM_API_KEY
-    - name: CodeGenerator
-      description: Scaffolds the package with the axiom CLI (axiom init, axiom create message, axiom create node), uses the LLM to fill in proto fields, function bodies, and test assertions, then runs axiom publish. Uses fix_instructions on retry iterations.
-      input: PackageBuildContext
-      output: PackageBuildContext
-      required_secrets:
-        - ANTHROPIC_API_KEY
-        - GITHUB_TOKEN
-        - AXIOM_API_KEY
-    - name: PackageTester
-      description: Directly invokes each published node via POST /v1/nodes/<ulid> with synthetic test inputs and populates test_success, test_error, execution_id, and session_id.
-      input: PackageBuildContext
-      output: PackageBuildContext
-      required_secrets:
-        - AXIOM_API_KEY
-    - name: PackageErrorAnalyser
-      description: Reads the debug event stream, diagnoses errors, and populates has_error, fix_instructions, and error_summary. Sets has_error=false when tests pass or only missing secrets remain.
-      input: PackageBuildContext
-      output: PackageBuildContext
-      required_secrets:
-        - ANTHROPIC_API_KEY
-        - AXIOM_API_KEY
-    - name: BuildResult
-      description: Terminal node. Converts the final PackageBuildContext into an AgentProgress with stage=complete/error.
-      input: PackageBuildContext
-      output: AgentProgress
-imports:
-    - package: axiom-official/axiom-agent-messages
-      version: 0.1.0
-      messages:
-        - AgentRequest
-        - NodeSpec
-        - PackageBuildContext
-        - AgentProgress
-        - FlowBuildContext
+  - name: IntentClassifier
+    input: AgentRequest
+    output: PackageBuildContext
+    description: Parses the user's prompt and produces an initial PackageBuildContext with inferred node names, descriptions, and proto message stubs.
+    required_secrets:
+      - ANTHROPIC_API_KEY
+  - name: PackageDesigner
+    input: PackageBuildContext
+    output: PackageBuildContext
+    description: Expands the context to include full proto message definitions and detailed node interface contracts, searching the marketplace for reusable packages first.
+    required_secrets:
+      - AXIOM_API_KEY
+  - name: CodeGenerator
+    input: PackageBuildContext
+    output: PackageBuildContext
+    description: Scaffolds the package with the axiom CLI (axiom init, axiom create message, axiom create node), uses the LLM to fill in proto fields, function bodies, and test assertions, then runs axiom publish. Uses fix_instructions on retry iterations.
+    required_secrets:
+      - ANTHROPIC_API_KEY
+      - GITHUB_TOKEN
+      - AXIOM_API_KEY
+  - name: PackageTester
+    input: PackageBuildContext
+    output: PackageBuildContext
+    description: Directly invokes each published node via POST /v1/nodes/<ulid> with synthetic test inputs and populates test_success, test_error, execution_id, and session_id.
+    required_secrets:
+      - AXIOM_API_KEY
+  - name: PackageErrorAnalyser
+    input: PackageBuildContext
+    output: PackageBuildContext
+    description: Reads the debug event stream, diagnoses errors, and populates has_error, fix_instructions, and error_summary. Sets has_error=false when tests pass or only missing secrets remain.
+    required_secrets:
+      - ANTHROPIC_API_KEY
+      - AXIOM_API_KEY
+  - name: BuildResult
+    input: PackageBuildContext
+    output: AgentProgress
+    description: Terminal node. Converts the final PackageBuildContext into an AgentProgress with stage=complete/error.
 build:
-    system_deps:
-        - git
-        - axiom
+  system_deps:
+    - git
+    - axiom
+imports:
+  - package: axiom-official/axiom-agent-messages
+    version: 0.1.0
+    messages:
+      - AgentRequest
+      - NodeSpec
+      - PackageBuildContext
+      - AgentProgress
