@@ -15,7 +15,7 @@ Workflow:
   7. LLM fills function body into each nodes/<name>.py
   8. LLM fills test assertions into each nodes/test_<name>.py
   9. git init + push to GitHub (create repo if needed)
-  10. axiom publish --json
+  10. axiom push --json
 """
 
 import json
@@ -55,7 +55,7 @@ def _run(cmd: list[str], cwd: str, log: AxiomLogger | None = None, check: bool =
 
 
 def _write_axiom_credentials(token: str) -> None:
-    """Write axiom credentials file so 'axiom publish' can authenticate."""
+    """Write axiom credentials file so 'axiom push' can authenticate."""
     path = os.path.expanduser("~/.axiom/credentials")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
@@ -270,8 +270,8 @@ def _fill_test_assertions(
 ) -> None:
     """LLM fills meaningful test assertions into the scaffolded test file."""
     snake_name = _to_snake(node.name)
-    # axiom create node generates <name>_test.py (e.g. add_test.py)
-    test_path = os.path.join(tmpdir, "nodes", f"{snake_name}_test.py")
+    # axiom create node generates test_<name>.py (e.g. test_add.py)
+    test_path = os.path.join(tmpdir, "nodes", f"test_{snake_name}.py")
 
     if not os.path.exists(test_path):
         log.info(f"Warning: {test_path} not found, skipping test fill")
@@ -326,13 +326,12 @@ Rules:
     _write_file(test_path, updated_tests)
     log.info(f"Test assertions filled: nodes/test_{snake_name}.py ({len(updated_tests)} chars)")
 
-
 def code_generator(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildContext) -> PackageBuildContext:
     """CLI-driven package code generation.
 
     Scaffolds the package using the axiom CLI, then uses the LLM to fill in only
     the proto fields, function bodies, and test assertions. After a successful
-    build + test (inside Docker via axiom publish), clears fix_instructions.
+    build + test (inside Docker via axiom push), clears fix_instructions.
     On error, populates publish_error for PackageErrorAnalyser to diagnose.
     """
     api_key, _ = secrets.get("ANTHROPIC_API_KEY")
@@ -440,15 +439,15 @@ def code_generator(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildC
         env = os.environ.copy()
         env["AXIOM_API_URL"] = registry_url
 
-        log.info("Running: axiom publish --json")
+        log.info("Running: axiom push --json")
         result = subprocess.run(
-            ["axiom", "publish", "--json"],
+            ["axiom", "push", "--json"],
             cwd=pkg_dir, capture_output=True, text=True, env=env
         )
 
-        log.info(f"axiom publish stdout: {result.stdout[-1000:]}")
+        log.info(f"axiom push stdout: {result.stdout[-1000:]}")
         if result.stderr.strip():
-            log.info(f"axiom publish stderr: {result.stderr[-500:]}")
+            log.info(f"axiom push stderr: {result.stderr[-500:]}")
 
         if result.returncode != 0:
             # Try to parse structured JSON error first
@@ -473,7 +472,7 @@ def code_generator(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildC
             except (json.JSONDecodeError, ValueError):
                 input.publish_error = (result.stderr or result.stdout)[-500:]
             input.publish_success = False
-            log.info(f"Publish failed: {input.publish_error}")
+            log.info(f"Push failed: {input.publish_error}")
         else:
             try:
                 data = json.loads(result.stdout)
@@ -487,12 +486,12 @@ def code_generator(log: AxiomLogger, secrets: AxiomSecrets, input: PackageBuildC
                     log.info(f"Publish reported failure: {input.publish_error}")
                 else:
                     input.publish_error = ""
-                    log.info("Package published successfully")
+                    log.info("Package pushed successfully")
             except (json.JSONDecodeError, ValueError):
                 # Fallback: if JSON parse fails but exit code was 0, treat as success
                 input.publish_success = True
                 input.publish_error = ""
-                log.info("Package published successfully (non-JSON output)")
+                log.info("Package pushed successfully (non-JSON output)")
 
         # Clear fix_instructions after consuming them
         input.fix_instructions = ""

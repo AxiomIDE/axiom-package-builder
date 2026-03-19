@@ -1,5 +1,4 @@
 import json
-import os
 
 import httpx
 import anthropic
@@ -24,18 +23,17 @@ def package_error_analyser(log: AxiomLogger, secrets: AxiomSecrets, input: Packa
         return input
 
     api_key, _ = secrets.get("ANTHROPIC_API_KEY")
+    axiom_api_key, _ = secrets.get("AXIOM_API_KEY")
+
     debug_events_text = ""
     if input.session_id:
-        ingress_url = os.environ.get("INGRESS_URL", "http://axiom-ingress.default.svc.cluster.local:80")
-        axiom_api_key, _ = secrets.get("AXIOM_API_KEY")
-        tenant_id = os.environ.get("TENANT_ID", "01AXIOMOFFICIAL000000000000")
+        gateway_url = "http://axiom-gateway.default.svc.cluster.local:8090"
         try:
             resp = httpx.get(
-                f"{ingress_url}/v1/debug-events",
+                f"{gateway_url}/v1/debug-events",
                 params={"session_id": input.session_id, "limit": "50"},
                 headers={
                     "Authorization": f"Bearer {axiom_api_key}",
-                    "X-Tenant-Id": tenant_id,
                 },
                 timeout=10.0
             )
